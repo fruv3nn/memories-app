@@ -1,12 +1,15 @@
 // ============================================
-// GANTI DUA VARIABEL INI DENGAN PUNYA LO
+// KONFIGURASI (GANTI PUNYA LO)
 // ============================================
-const SUPABASE_URL = "https://gipuosbszwhqhaozljqr.supabase.co";
-const SUPABASE_ANON_KEY = "sb_publishable_n41eQryexfFKe97UJj2MqA_GKEmK7GO"; // ganti
-// ============================================
-
+const SUPABASE_URL = "https://gipuosbszwhqhaozljqr.supabase.co"; // URL LO
+const SUPABASE_ANON_KEY = "sb_publishable_n41eQryexfFKe97UJj2MqA_GKEmK7GO"; // GANTI DENGAN PUBLISHABLE KEY LO
 const BUCKET = "memories";
+// ============================================
 
+// DOM Elements
+const uploadModal = document.getElementById("uploadModal");
+const openUploadBtn = document.getElementById("openUploadBtn");
+const closeUpload = document.getElementById("closeUpload");
 const uploadForm = document.getElementById("uploadForm");
 const photoInput = document.getElementById("photo");
 const preview = document.getElementById("preview");
@@ -15,26 +18,31 @@ const statusMsg = document.getElementById("statusMsg");
 const gallery = document.getElementById("gallery");
 const modal = document.getElementById("modal");
 
-// --- Preview foto sebelum upload ---
+// --- MODAL UPLOAD LOGIC ---
+openUploadBtn.addEventListener("click", () => {
+  uploadModal.classList.add("active");
+});
+closeUpload.addEventListener("click", () => {
+  uploadModal.classList.remove("active");
+  statusMsg.textContent = "";
+  statusMsg.className = "status";
+});
+
+// --- PREVIEW FOTO ---
 photoInput.addEventListener("change", (e) => {
   const file = e.target.files[0];
   if (!file) return preview.innerHTML = "";
   const reader = new FileReader();
-  reader.onload = (ev) => {
-    preview.innerHTML = `<img src="${ev.target.result}" alt="preview" />`;
-  };
+  reader.onload = (ev) => preview.innerHTML = `<img src="${ev.target.result}" alt="preview" />`;
   reader.readAsDataURL(file);
 });
 
-// --- Generate nama file unik ---
+// --- UPLOAD FOTO KE SUPABASE ---
 function generateFileName(file) {
   const ext = file.name.split(".").pop();
-  const timestamp = Date.now();
-  const random = Math.random().toString(36).substring(2, 8);
-  return `memory-${timestamp}-${random}.${ext}`;
+  return `memory-${Date.now()}-${Math.random().toString(36).substring(2, 8)}.${ext}`;
 }
 
-// --- Upload foto ke Supabase Storage ---
 async function uploadPhoto(file) {
   const fileName = generateFileName(file);
   const url = `${SUPABASE_URL}/storage/v1/object/${BUCKET}/${fileName}`;
@@ -44,22 +52,20 @@ async function uploadPhoto(file) {
     headers: {
       "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
       "apikey": SUPABASE_ANON_KEY,
-      "Content-Type": file.type,
-      "x-upsert": "true"
+      "Content-Type": file.type
     },
     body: file
   });
 
   if (!res.ok) {
-    const errText = await res.text();
-    throw new Error(`Upload gagal: ${errText}`);
+    const errorText = await res.text();
+    throw new Error(`Upload foto gagal: ${errorText}`);
   }
-
-  // Public URL
+  
   return `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${fileName}`;
 }
 
-// --- Simpan metadata ke database ---
+// --- SIMPAN KE DATABASE ---
 async function saveMemory(data) {
   const res = await fetch(`${SUPABASE_URL}/rest/v1/memories`, {
     method: "POST",
@@ -73,86 +79,70 @@ async function saveMemory(data) {
   });
 
   if (!res.ok) {
-    const errText = await res.text();
-    throw new Error(`Simpan DB gagal: ${errText}`);
+    const errorText = await res.text();
+    throw new Error(`Simpan ke database gagal: ${errorText}`);
   }
-
   return await res.json();
 }
 
-// --- Submit form ---
+// --- SUBMIT FORM ---
 uploadForm.addEventListener("submit", async (e) => {
   e.preventDefault();
-
   const title = document.getElementById("title").value.trim();
   const description = document.getElementById("description").value.trim();
   const memoryDate = document.getElementById("memoryDate").value || null;
   const file = photoInput.files[0];
 
-  if (!title || !file) {
-    showStatus("Judul & foto wajib diisi!", "error");
-    return;
-  }
+  if (!title || !file) return showStatus("Judul & foto wajib diisi!", "error");
 
   submitBtn.disabled = true;
   submitBtn.querySelector("span").textContent = "⏳ Mengupload...";
   showStatus("Sedang upload foto & menyimpan...", "");
 
   try {
-    // 1. Upload foto
     const photoUrl = await uploadPhoto(file);
-
-    // 2. Simpan metadata
-    await saveMemory({
-      title,
-      description,
-      photo_url: photoUrl,
-      memory_date: memoryDate
-    });
-
+    await saveMemory({ title, description, photo_url: photoUrl, memory_date: memoryDate });
+    
     showStatus("💕 Kenangan berhasil disimpan!", "success");
     uploadForm.reset();
     preview.innerHTML = "";
+    
+    setTimeout(() => { 
+      uploadModal.classList.remove("active"); 
+      statusMsg.textContent = "";
+    }, 1500);
+    
     await loadMemories();
-
   } catch (err) {
-    console.error(err);
-    showStatus("Gagal: " + err.message, "error");
+    showStatus(err.message, "error");
   } finally {
     submitBtn.disabled = false;
     submitBtn.querySelector("span").textContent = "💾 Simpan Kenangan";
   }
 });
 
-// --- Load semua kenangan ---
+// --- LOAD GALERI ---
 async function loadMemories() {
   gallery.innerHTML = '<p class="loading">Memuat kenangan...</p>';
-
+  
   try {
-    const res = await fetch(
-      `${SUPABASE_URL}/rest/v1/memories?select=*&order=created_at.desc`,
-      {
-        headers: {
-          "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
-          "apikey": SUPABASE_ANON_KEY
-        }
+    const res = await fetch(`${SUPABASE_URL}/rest/v1/memories?select=*&order=created_at.desc`, {
+      headers: {
+        "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
+        "apikey": SUPABASE_ANON_KEY
       }
-    );
+    });
 
     if (!res.ok) throw new Error(await res.text());
     const data = await res.json();
 
     if (!data.length) {
-      gallery.innerHTML = '<p class="loading">Belum ada kenangan. Yuk upload yang pertama! 💕</p>';
+      gallery.innerHTML = '<p class="loading">Belum ada kenangan. Yuk klik tombol Tambah di atas! 💕</p>';
       return;
     }
 
     gallery.innerHTML = data.map(m => `
-      <div class="memory-card" 
-           data-img="${m.photo_url}"
-           data-title="${escapeHtml(m.title)}"
-           data-desc="${escapeHtml(m.description || '')}"
-           data-date="${m.memory_date || ''}">
+      <div class="memory-card" data-img="${m.photo_url}" data-title="${escapeHtml(m.title)}" data-desc="${escapeHtml(m.description || '')}" data-date="${m.memory_date || ''}">
         <img src="${m.photo_url}" alt="${escapeHtml(m.title)}" loading="lazy" />
         <div class="card-body">
           <h3>${escapeHtml(m.title)}</h3>
@@ -161,35 +151,16 @@ async function loadMemories() {
       </div>
     `).join("");
 
-    // Pasang event modal
     document.querySelectorAll(".memory-card").forEach(card => {
-      card.addEventListener("click", () => openModal(card.dataset));
+      card.addEventListener("click", () => openDetailModal(card.dataset));
     });
-
   } catch (err) {
-    console.error(err);
     gallery.innerHTML = `<p class="loading">Gagal memuat: ${escapeHtml(err.message)}</p>`;
   }
 }
 
-function escapeHtml(str) {
-  const div = document.createElement("div");
-  div.textContent = str;
-  return div.innerHTML;
-}
-
-function formatDate(dateStr) {
-  const d = new Date(dateStr);
-  return d.toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
-}
-
-function showStatus(msg, type) {
-  statusMsg.textContent = msg;
-  statusMsg.className = "status " + type;
-}
-
-// --- Modal ---
-function openModal({ img, title, desc, date }) {
+// --- MODAL DETAIL FOTO ---
+function openDetailModal({ img, title, desc, date }) {
   document.getElementById("modalImg").src = img;
   document.getElementById("modalTitle").textContent = title;
   document.getElementById("modalDesc").textContent = desc || "(Tidak ada cerita)";
@@ -197,15 +168,28 @@ function openModal({ img, title, desc, date }) {
   modal.classList.add("active");
 }
 
-document.querySelector(".close").addEventListener("click", () => {
-  modal.classList.remove("active");
-});
-
+document.getElementById("closeDetail").addEventListener("click", () => modal.classList.remove("active"));
 modal.addEventListener("click", (e) => {
   if (e.target === modal) modal.classList.remove("active");
 });
 
-// --- Floating hearts background ---
+// --- FUNGSI BANTUAN ---
+function escapeHtml(str) {
+  const div = document.createElement("div");
+  div.textContent = str;
+  return div.innerHTML;
+}
+
+function formatDate(dateStr) {
+  return new Date(dateStr).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
+}
+
+function showStatus(msg, type) {
+  statusMsg.textContent = msg;
+  statusMsg.className = "status " + type;
+}
+
+// --- FLOATING HEARTS ---
 function createHearts() {
   const bg = document.getElementById("heartsBg");
   const hearts = ["💕", "💖", "💗", "💙", "✨", "🩷", "🩵"];
@@ -221,6 +205,6 @@ function createHearts() {
   }
 }
 
-// --- Init ---
+// --- JALANKAN ---
 createHearts();
 loadMemories();
