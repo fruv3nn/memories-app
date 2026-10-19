@@ -1,0 +1,74 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>💕 Our Memories</title>
+  <link rel="stylesheet" href="style.css" />
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;600;700&display=swap" rel="stylesheet">
+</head>
+<body>
+  <!-- Floating hearts background -->
+  <div class="hearts-bg" id="heartsBg"></div>
+
+  <!-- Header -->
+  <header class="hero">
+    <h1 class="hero-title">💕 Our Memories 💙</h1>
+    <p class="hero-sub">Setiap momen bersamamu adalah kenangan terindah</p>
+  </header>
+
+  <!-- Upload Form -->
+  <section class="upload-section">
+    <h2>✨ Tambah Kenangan Baru</h2>
+    <form id="uploadForm" class="upload-form">
+      <div class="form-group">
+        <label for="title">Judul Kenangan</label>
+        <input type="text" id="title" placeholder="Contoh: First Date di Kafe" required />
+      </div>
+      <div class="form-group">
+        <label for="description">Cerita Singkat</label>
+        <textarea id="description" placeholder="Ceritakan momen ini..." rows="3"></textarea>
+      </div>
+      <div class="form-group">
+        <label for="memoryDate">Tanggal</label>
+        <input type="date" id="memoryDate" />
+      </div>
+      <div class="form-group">
+        <label for="photo">Pilih Foto</label>
+        <input type="file" id="photo" accept="image/*" required />
+        <div id="preview" class="preview"></div>
+      </div>
+      <button type="submit" id="submitBtn" class="btn-primary">
+        <span>💾 Simpan Kenangan</span>
+      </button>
+      <p id="statusMsg" class="status"></p>
+    </form>
+  </section>
+
+  <!-- Gallery -->
+  <section class="gallery-section">
+    <h2>📸 Galeri Kenangan</h2>
+    <div id="gallery" class="gallery">
+      <p class="loading">Memuat kenangan...</p>
+    </div>
+  </section>
+
+  <!-- Modal -->
+  <div id="modal" class="modal">
+    <div class="modal-content">
+      <span class="close">&times;</span>
+      <img id="modalImg" src="" alt="" />
+      <h3 id="modalTitle"></h3>
+      <p id="modalDesc"></p>
+      <p id="modalDate" class="modal-date"></p>
+    </div>
+  </div>
+
+  <!-- Footer -->
+  <footer>
+    <p>Made with 💗 for our love story</p>
+  </footer>
+
+  <script src="script.js"></script>
+</body>
+</html>
