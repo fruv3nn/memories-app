@@ -1,10 +1,9 @@
 // ============================================
-// KONFIGURASI
+// KONFIGURASI (UDAH GW BENERIN)
 // ============================================
-const SUPABASE_URL = "https://gipuosbszwhqhaozljqr.supabase.co"; 
+const SUPABASE_URL = "https://gipuosbszwhqhaozljqr.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdpcHVvc2JzendnaHFhb3psanFyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI0MTQ5NjMsImV4cCI6MjEwNzk5MDk2M30.XvaP7AYoVzPUQqvAl34OgkLWk5yF4ReFDLMWoHp0q_I";
 const BUCKET = "memories";
-// ============================================
 // ============================================
 
 // DOM Elements
@@ -38,24 +37,59 @@ photoInput.addEventListener("change", (e) => {
   reader.readAsDataURL(file);
 });
 
-// --- UPLOAD FOTO KE SUPABASE ---
-function generateFileName(file) {
-  const ext = file.name.split(".").pop();
-  return `memory-${Date.now()}-${Math.random().toString(36).substring(2, 8)}.${ext}`;
+// --- FUNGSI KOMPRES FOTO (JURUS TERAKHIR) ---
+async function compressImage(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.readAsDataURL(file);
+    reader.onload = (event) => {
+      const img = new Image();
+      img.src = event.target.result;
+      img.onload = () => {
+        const canvas = document.createElement("canvas");
+        const MAX_WIDTH = 1200; // Lebar maksimal
+        const scaleSize = MAX_WIDTH / img.width;
+        canvas.width = MAX_WIDTH;
+        canvas.height = img.height * scaleSize;
+
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+        
+        // Kompres jadi JPEG kualitas 70%
+        canvas.toBlob((blob) => {
+          if (!blob) {
+            reject(new Error("Gagal kompres gambar"));
+            return;
+          }
+          resolve(blob);
+        }, "image/jpeg", 0.7);
+      };
+      img.onerror = () => reject(new Error("File bukan gambar yang valid"));
+    };
+    reader.onerror = () => reject(new Error("Gagal baca file"));
+  });
 }
 
+function generateFileName() {
+  return `memory-${Date.now()}-${Math.random().toString(36).substring(2, 8)}.jpg`;
+}
+
+// --- UPLOAD KE SUPABASE (PAKE FOTO YANG UDAH DIKOMPRES) ---
 async function uploadPhoto(file) {
-  const fileName = generateFileName(file);
+  // 1. Kompres dulu!
+  const compressedBlob = await compressImage(file);
+  const fileName = generateFileName();
   const url = `${SUPABASE_URL}/storage/v1/object/${BUCKET}/${fileName}`;
 
+  // 2. Upload ke Supabase
   const res = await fetch(url, {
     method: "POST",
     headers: {
       "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
       "apikey": SUPABASE_ANON_KEY,
-      "Content-Type": file.type
+      "Content-Type": "image/jpeg" // Paksa jadi jpeg
     },
-    body: file
+    body: compressedBlob
   });
 
   if (!res.ok) {
@@ -97,8 +131,8 @@ uploadForm.addEventListener("submit", async (e) => {
   if (!title || !file) return showStatus("Judul & foto wajib diisi!", "error");
 
   submitBtn.disabled = true;
-  submitBtn.querySelector("span").textContent = "⏳ Mengupload...";
-  showStatus("Sedang upload foto & menyimpan...", "");
+  submitBtn.querySelector("span").textContent = "⏳ Memproses...";
+  showStatus("Sedang kompres & upload foto...", "");
 
   try {
     const photoUrl = await uploadPhoto(file);
