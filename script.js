@@ -64,25 +64,25 @@ async function compressAndBase64(file) {
   });
 }
 
-// --- UPLOAD VIA BASE64 (ANTI BLOKIR) ---
+// --- UPLOAD VIA BASE64 (ANTI BLOKIR & ANTI PECAH) ---
 async function uploadPhoto(file) {
   showStatus("Mengompres & mengirim foto...", "");
   
-  // 1. Ubah gambar jadi teks Base64
   const base64String = await compressAndBase64(file);
   const fileName = `memory-${Date.now()}.jpg`;
   const url = `${SUPABASE_URL}/storage/v1/object/${BUCKET}/${fileName}`;
 
-  // 2. Kirim sebagai Text Biasa (nggak bakal kena blokir browser)
+  // PERBAIKAN: Tambah Content-Encoding: base64 dan Content-Type: image/jpeg
   const res = await fetch(url, {
     method: "POST",
     headers: {
       "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
       "apikey": SUPABASE_ANON_KEY,
-      "Content-Type": "text/plain", // <--- KUNCI RAHASIANYA DI SINI
+      "Content-Type": "image/jpeg", 
+      "Content-Encoding": "base64", // <--- KUNCI BIAR GAMBAR GA PECAH
       "x-upsert": "true"
     },
-    body: base64String // Kirim teksnya
+    body: base64String
   });
 
   if (!res.ok) {
