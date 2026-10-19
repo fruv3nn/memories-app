@@ -1,9 +1,10 @@
 // ============================================
-// KONFIGURASI (GANTI PUNYA LO)
+// KONFIGURASI
 // ============================================
-const SUPABASE_URL = "https://gipuosbszwhqhaozljqr.supabase.co"; // URL LO
-const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdpcHVvc2JzendnaHFhb3psanFyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI0MTQ5NjMsImV4cCI6MjEwNzk5MDk2M30.XvaP7AYoVzPUQqvAl34OgkLWk5yF4ReFDLMWoHp0q_I"; // GANTI DENGAN PUBLISHABLE KEY LO
+const SUPABASE_URL = "https://gipuosbszwhqhaozljqr.supabase.co"; 
+const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdpcHVvc2JzendnaHFhb3psanFyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI0MTQ5NjMsImV4cCI6MjEwNzk5MDk2M30.XvaP7AYoVzPUQqvAl34OgkLWk5yF4ReFDLMWoHp0q_I";
 const BUCKET = "memories";
+// ============================================
 // ============================================
 
 // DOM Elements
