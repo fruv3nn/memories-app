@@ -35,8 +35,8 @@ photoInput.addEventListener("change", (e) => {
   reader.readAsDataURL(file);
 });
 
-// --- FUNGSI KOMPRES & UBAH KE BASE64 ---
-async function compressAndBase64(file) {
+// --- FUNGSI KOMPRES JADI FILE GAMBAR ASLI ---
+async function compressImageToFile(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.readAsDataURL(file);
@@ -53,10 +53,14 @@ async function compressAndBase64(file) {
         const ctx = canvas.getContext("2d");
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
         
-        // Ubah ke Data URL (Base64)
-        const base64Data = canvas.toDataURL("image/jpeg", 0.6); 
-        // Buang awalan "data:image/jpeg;base64,"
-        resolve(base64Data.split(',')[1]); 
+        // Ubah canvas jadi Blob gambar
+        canvas.toBlob((blob) => {
+          if (!blob) return reject(new Error("Gagal kompres gambar"));
+          
+          // Bungkus jadi File asli
+          const newFile = new File([blob], `memory-${Date.now()}.jpg`, { type: "image/jpeg" });
+          resolve(newFile);
+        }, "image/jpeg", 0.7);
       };
       img.onerror = () => reject(new Error("File bukan gambar valid"));
     };
@@ -64,25 +68,28 @@ async function compressAndBase64(file) {
   });
 }
 
-// --- UPLOAD VIA BASE64 (ANTI BLOKIR & ANTI PECAH) ---
+// --- UPLOAD FOTO (PAKE FORMDATA) ---
 async function uploadPhoto(file) {
-  showStatus("Mengompres & mengirim foto...", "");
+  showStatus("Memproses & mengupload foto...", "");
   
-  const base64String = await compressAndBase64(file);
-  const fileName = `memory-${Date.now()}.jpg`;
+  // 1. Kompres jadi File gambar asli
+  const compressedFile = await compressImageToFile(file);
+  const fileName = compressedFile.name;
   const url = `${SUPABASE_URL}/storage/v1/object/${BUCKET}/${fileName}`;
 
-  // PERBAIKAN: Tambah Content-Encoding: base64 dan Content-Type: image/jpeg
+  // 2. Bungkus pake FormData (Standar Upload File)
+  const formData = new FormData();
+  formData.append("file", compressedFile);
+
+  // 3. Kirim ke Supabase
   const res = await fetch(url, {
     method: "POST",
     headers: {
       "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
       "apikey": SUPABASE_ANON_KEY,
-      "Content-Type": "image/jpeg", 
-      "Content-Encoding": "base64", // <--- KUNCI BIAR GAMBAR GA PECAH
       "x-upsert": "true"
     },
-    body: base64String
+    body: formData
   });
 
   if (!res.ok) {
@@ -224,5 +231,6 @@ function createHearts() {
   }
 }
 
+// --- JALANKAN ---
 createHearts();
 loadMemories();
