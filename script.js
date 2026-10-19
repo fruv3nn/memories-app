@@ -1,7 +1,7 @@
 // ============================================
-// KONFIGURASI (UDAH GW BENERIN)
+// KONFIGURASI
 // ============================================
-const SUPABASE_URL = "https://gipuosbszwhqhaozljqr.supabase.co";
+const SUPABASE_URL = "https://gipuosbszwghqaozljqr.supabase.co";
 const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImdpcHVvc2JzendnaHFhb3psanFyIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTI0MTQ5NjMsImV4cCI6MjEwNzk5MDk2M30.XvaP7AYoVzPUQqvAl34OgkLWk5yF4ReFDLMWoHp0q_I";
 const BUCKET = "memories";
 // ============================================
@@ -19,9 +19,7 @@ const gallery = document.getElementById("gallery");
 const modal = document.getElementById("modal");
 
 // --- MODAL UPLOAD LOGIC ---
-openUploadBtn.addEventListener("click", () => {
-  uploadModal.classList.add("active");
-});
+openUploadBtn.addEventListener("click", () => uploadModal.classList.add("active"));
 closeUpload.addEventListener("click", () => {
   uploadModal.classList.remove("active");
   statusMsg.textContent = "";
@@ -37,8 +35,8 @@ photoInput.addEventListener("change", (e) => {
   reader.readAsDataURL(file);
 });
 
-// --- FUNGSI KOMPRES FOTO (JURUS TERAKHIR) ---
-async function compressImage(file) {
+// --- FUNGSI KOMPRES & UBAH KE BASE64 ---
+async function compressAndBase64(file) {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.readAsDataURL(file);
@@ -47,7 +45,7 @@ async function compressImage(file) {
       img.src = event.target.result;
       img.onload = () => {
         const canvas = document.createElement("canvas");
-        const MAX_WIDTH = 1200; // Lebar maksimal
+        const MAX_WIDTH = 800; // Ukuran dikecilin biar ringan
         const scaleSize = MAX_WIDTH / img.width;
         canvas.width = MAX_WIDTH;
         canvas.height = img.height * scaleSize;
@@ -55,46 +53,41 @@ async function compressImage(file) {
         const ctx = canvas.getContext("2d");
         ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
         
-        // Kompres jadi JPEG kualitas 70%
-        canvas.toBlob((blob) => {
-          if (!blob) {
-            reject(new Error("Gagal kompres gambar"));
-            return;
-          }
-          resolve(blob);
-        }, "image/jpeg", 0.7);
+        // Ubah ke Data URL (Base64)
+        const base64Data = canvas.toDataURL("image/jpeg", 0.6); 
+        // Buang awalan "data:image/jpeg;base64,"
+        resolve(base64Data.split(',')[1]); 
       };
-      img.onerror = () => reject(new Error("File bukan gambar yang valid"));
+      img.onerror = () => reject(new Error("File bukan gambar valid"));
     };
     reader.onerror = () => reject(new Error("Gagal baca file"));
   });
 }
 
-function generateFileName() {
-  return `memory-${Date.now()}-${Math.random().toString(36).substring(2, 8)}.jpg`;
-}
-
-// --- UPLOAD KE SUPABASE (PAKE FOTO YANG UDAH DIKOMPRES) ---
+// --- UPLOAD VIA BASE64 (ANTI BLOKIR) ---
 async function uploadPhoto(file) {
-  // 1. Kompres dulu!
-  const compressedBlob = await compressImage(file);
-  const fileName = generateFileName();
+  showStatus("Mengompres & mengirim foto...", "");
+  
+  // 1. Ubah gambar jadi teks Base64
+  const base64String = await compressAndBase64(file);
+  const fileName = `memory-${Date.now()}.jpg`;
   const url = `${SUPABASE_URL}/storage/v1/object/${BUCKET}/${fileName}`;
 
-  // 2. Upload ke Supabase
+  // 2. Kirim sebagai Text Biasa (nggak bakal kena blokir browser)
   const res = await fetch(url, {
     method: "POST",
     headers: {
       "Authorization": `Bearer ${SUPABASE_ANON_KEY}`,
       "apikey": SUPABASE_ANON_KEY,
-      "Content-Type": "image/jpeg" // Paksa jadi jpeg
+      "Content-Type": "text/plain", // <--- KUNCI RAHASIANYA DI SINI
+      "x-upsert": "true"
     },
-    body: compressedBlob
+    body: base64String // Kirim teksnya
   });
 
   if (!res.ok) {
     const errorText = await res.text();
-    throw new Error(`Upload foto gagal: ${errorText}`);
+    throw new Error(`Upload gagal: ${errorText}`);
   }
   
   return `${SUPABASE_URL}/storage/v1/object/public/${BUCKET}/${fileName}`;
@@ -113,10 +106,7 @@ async function saveMemory(data) {
     body: JSON.stringify(data)
   });
 
-  if (!res.ok) {
-    const errorText = await res.text();
-    throw new Error(`Simpan ke database gagal: ${errorText}`);
-  }
+  if (!res.ok) throw new Error("Gagal simpan ke database");
   return await res.json();
 }
 
@@ -132,7 +122,6 @@ uploadForm.addEventListener("submit", async (e) => {
 
   submitBtn.disabled = true;
   submitBtn.querySelector("span").textContent = "⏳ Memproses...";
-  showStatus("Sedang kompres & upload foto...", "");
 
   try {
     const photoUrl = await uploadPhoto(file);
@@ -159,7 +148,6 @@ uploadForm.addEventListener("submit", async (e) => {
 // --- LOAD GALERI ---
 async function loadMemories() {
   gallery.innerHTML = '<p class="loading">Memuat kenangan...</p>';
-  
   try {
     const res = await fetch(`${SUPABASE_URL}/rest/v1/memories?select=*&order=created_at.desc`, {
       headers: {
@@ -172,7 +160,7 @@ async function loadMemories() {
     const data = await res.json();
 
     if (!data.length) {
-      gallery.innerHTML = '<p class="loading">Belum ada kenangan. Yuk klik tombol Tambah di atas! 💕</p>';
+      gallery.innerHTML = '<p class="loading">Belum ada kenangan. Yuk klik Tambah! 💕</p>';
       return;
     }
 
@@ -204,9 +192,7 @@ function openDetailModal({ img, title, desc, date }) {
 }
 
 document.getElementById("closeDetail").addEventListener("click", () => modal.classList.remove("active"));
-modal.addEventListener("click", (e) => {
-  if (e.target === modal) modal.classList.remove("active");
-});
+modal.addEventListener("click", (e) => { if (e.target === modal) modal.classList.remove("active"); });
 
 // --- FUNGSI BANTUAN ---
 function escapeHtml(str) {
@@ -214,11 +200,9 @@ function escapeHtml(str) {
   div.textContent = str;
   return div.innerHTML;
 }
-
 function formatDate(dateStr) {
   return new Date(dateStr).toLocaleDateString("id-ID", { day: "numeric", month: "long", year: "numeric" });
 }
-
 function showStatus(msg, type) {
   statusMsg.textContent = msg;
   statusMsg.className = "status " + type;
@@ -240,6 +224,5 @@ function createHearts() {
   }
 }
 
-// --- JALANKAN ---
 createHearts();
 loadMemories();
